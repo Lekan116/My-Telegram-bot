@@ -17,6 +17,13 @@ USDT_ADDRESS = os.getenv("USDT_ADDRESS")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# === REPLY KEYBOARD FUNCTION ===
+def main_menu():
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.row("🇨🇦 Canada SMS Leads", "🇺🇸 USA Leads")
+    markup.row("💸 Payment Info", "🛒 Order Now")
+    return markup
+
 # === BOT COMMANDS ===
 bot.set_my_commands([
     BotCommand("start", "Start the bot and view menu"),
@@ -163,6 +170,41 @@ def send_file(message):
         bot.reply_to(message, "✅ File sent.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error sending file: {e}")
+
+# === FALLBACK DYNAMIC MENU ===
+@bot.message_handler(func=lambda m: True)
+def handle_message(message):
+    text = message.text
+
+    if text == "🇨🇦 Canada SMS Leads":
+        bot.send_message(
+            message.chat.id,
+            "🇨🇦 Canada SMS Leads:\n• Fresh leads\n• High engagement\n• Price: $15 per 1,000"
+        )
+
+    elif text == "🇺🇸 USA Leads":
+        bot.send_message(
+            message.chat.id,
+            "🇺🇸 USA Leads:\n• SMS + Email\n• Price: $15 per 1,000"
+        )
+
+    elif text == "💸 Payment Info":
+        bot.send_message(
+            message.chat.id,
+            f"💳 Payment Wallets:\n\n₿ BTC: `{BTC_ADDRESS}`\nŁ LTC: `{LTC_ADDRESS}`\nΞ ETH: `{ETH_ADDRESS}`\n💲 USDT: `{USDT_ADDRESS}`\n\nSend proof here after payment.",
+            parse_mode="Markdown"
+        )
+
+    elif text == "🛒 Order Now":
+        bot.send_message(message.chat.id, "🛒 Please send your lead type and quantity. We will confirm and deliver fast.")
+        bot.send_message(ADMIN_ID, f"🛍️ New order interest from @{message.from_user.username or message.from_user.first_name}: {text}")
+
+    else:
+        bot.send_message(
+            message.chat.id,
+            "❗ Unrecognized command. Please use one of the options below.",
+            reply_markup=main_menu()
+        )
 
 # === RUN THE BOT ===
 bot.infinity_polling()

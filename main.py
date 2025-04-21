@@ -19,6 +19,7 @@ USDT_ADDRESS = os.getenv("USDT_ADDRESS")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# === BOT COMMANDS ===
 bot.set_my_commands([
     BotCommand("start", "Start the bot and view menu"),
     BotCommand("menu", "Show the country selection again"),
@@ -26,7 +27,8 @@ bot.set_my_commands([
     BotCommand("help", "How to use the bot & contact admin"),
 ])
 
-@bot.message_handler(commands=['start'])
+# === START / MENU COMMAND ===
+@bot.message_handler(commands=['start', 'menu'])
 def send_welcome(message):
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -44,6 +46,7 @@ def send_welcome(message):
         reply_markup=markup
     )
 
+# === HELP COMMAND ===
 @bot.message_handler(commands=['help'])
 def help_command(message):
     help_text = (
@@ -61,10 +64,7 @@ def help_command(message):
     )
     bot.send_message(message.chat.id, help_text, parse_mode="Markdown")
 
-@bot.message_handler(commands=['menu'])
-def send_menu(message):
-    send_welcome(message)
-
+# === CALLBACK HANDLER ===
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     country_data = {
@@ -81,16 +81,16 @@ def callback_query(call):
 🛒 *To order:*
 1️⃣ Pay to one of the wallets below:
 
-₿ *BTC*:
+₿ *BTC:*
 ```{BTC_ADDRESS}```
 
-Ł *LTC*:
+Ł *LTC:*
 ```{LTC_ADDRESS}```
 
-Ξ *ETH*:
+Ξ *ETH:*
 ```{ETH_ADDRESS}```
 
-💲 *USDT (ERC20)*:
+💲 *USDT (ERC20):*
 ```{USDT_ADDRESS}```
 
 2️⃣ Send payment screenshot, country, and quantity here.
@@ -100,29 +100,62 @@ def callback_query(call):
 
     elif call.data == "chat":
         bot.send_message(call.message.chat.id, "💬 Send your message below and the admin will reply shortly.")
-        bot.send_message(ADMIN_ID, f"User @{call.from_user.username or call.from_user.id} started a live chat.")
+        bot.send_message(ADMIN_ID, f"👤 User @{call.from_user.username or call.from_user.id} started a live chat.")
 
+# === SMART KEYWORDS ===
 @bot.message_handler(func=lambda message: message.text and message.text.lower() in ["help", "order", "how to order", "buy", "leads", "price", "payment"])
 def smart_reply(message):
-    bot.send_message(message.chat.id, "🛒 You can order leads by selecting a country with /menu. Then pay and send your proof.")
+    bot.send_message(message.chat.id, "🛒 Use /menu to pick a country, pay to the wallet, and send proof here. Admin will reply fast ⚡")
 
+# === FORWARD ALL MESSAGES TO ADMIN ===
 @bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and not message.text.startswith('/'))
 def forward_all_messages(message):
     bot.send_message(ADMIN_ID, f"📨 Message from {message.chat.id} (@{message.from_user.username}):\n{message.text}")
 
+# === ADMIN TEXT REPLY COMMAND ===
 @bot.message_handler(commands=['send'])
 def admin_send(message):
     parts = message.text.split(maxsplit=2)
     if len(parts) < 3:
-        bot.reply_to(message, "Usage: /send <user_id> <message>")
+        bot.reply_to(message, "⚠️ Usage: /send <user_id> <message>")
         return
     user_id, msg_text = parts[1], parts[2]
     try:
-        bot.send_message(int(user_id), f"🛡 Admin: {msg_text}")
+        bot.send_message(int(user_id), f"📩 Admin:\n{msg_text}")
         bot.reply_to(message, "✅ Message sent.")
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}")
 
+# === ADMIN FILE SEND COMMAND ===
+@bot.message_handler(commands=['file'])
+def send_file(message):
+    # 🧾 Usage: Admin replies to a document message and sends: /file <user_id> <filename>
+    parts = message.text.split(maxsplit=2)
+
+    if (
+        len(parts) < 3 or
+        not message.reply_to_message or
+        not message.reply_to_message.document
+    ):
+        bot.reply_to(message, "⚠️ Reply to a file with:\n/file <user_id> <filename>")
+        return
+
+    user_id = parts[1]
+    filename = parts[2]
+
+    try:
+        file_info = bot.get_file(message.reply_to_message.document.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        bot.send_document(
+            int(user_id),
+            InputFile(downloaded_file, filename),
+            caption="📁 File from Admin"
+        )
+        bot.reply_to(message, "✅ File sent.")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error sending file: {e}")
+
+# === BALANCE CHECK ===
 @bot.message_handler(commands=['checkbalance'])
 def check_balance(message):
     msg = (
@@ -131,7 +164,7 @@ def check_balance(message):
         f"Ł *LTC:*\n`{LTC_ADDRESS}`\n\n"
         f"Ξ *ETH:*\n`{ETH_ADDRESS}`\n\n"
         f"💲 *USDT (ERC20):*\n`{USDT_ADDRESS}`\n\n"
-        "🧾 Check payments on explorers:\n"
+        "🧾 Use explorers to verify:\n"
         "- https://blockchair.com\n"
         "- https://etherscan.io\n"
         "- https://blockstream.info\n"
@@ -139,4 +172,5 @@ def check_balance(message):
     )
     bot.send_message(message.chat.id, msg, parse_mode="Markdown")
 
-bot.polling()
+# === RUN ===
+bot.infinity_polling()
